@@ -1,0 +1,919 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zufallsgenerator · Miss English</title>
+<meta name="description" content="Glücksrad für die Klasse: Schülerlisten anlegen, Kranke ausblenden, zufällig auswählen.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎡</text></svg>">
+<style>
+  :root {
+    --bg: #fff8ef;
+    --panel: #ffffff;
+    --ink: #2b2140;
+    --muted: #7a6f8c;
+    --line: #eadfce;
+    --accent: #ff5d73;
+    --accent-2: #5b5bf0;
+    --ok: #1fa67a;
+    --sick: #e0a100;
+    --radius: 18px;
+    --shadow: 0 6px 24px rgba(43, 33, 64, .08);
+    font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: var(--bg); }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input, textarea, select { font: inherit; color: inherit; }
+
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 20px; margin: 0 8px 0 0; letter-spacing: -.01em; white-space: nowrap; }
+  header h1 span { color: var(--accent); }
+  .spacer { flex: 1; }
+
+  .btn {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
+    padding: 8px 14px; font-weight: 600; transition: transform .08s, background .15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: #fbf5ec; }
+  .btn:active { transform: scale(.97); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #f24a62; }
+  .btn.blue { background: var(--accent-2); border-color: var(--accent-2); color: #fff; }
+  .btn.blue:hover { background: #4949de; }
+  .btn.ghost { border-color: transparent; background: transparent; }
+  .btn.ghost:hover { background: #f4ecdf; }
+  .btn.danger { color: #c0392b; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn.small { padding: 4px 10px; font-size: 13px; border-radius: 9px; }
+
+  select.class-select {
+    border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; background: var(--panel);
+    font-weight: 700; min-width: 160px;
+  }
+
+  main {
+    flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; padding: 20px;
+    max-width: 1400px; width: 100%; margin: 0 auto;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+  .stage {
+    background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; gap: 18px;
+    min-height: 480px; position: relative;
+  }
+  .wheel-wrap { position: relative; width: min(100%, 72vh, 640px); aspect-ratio: 1; }
+  .wheel-wrap canvas { width: 100%; height: 100%; display: block; cursor: pointer; }
+  .pointer {
+    position: absolute; left: 50%; top: -6px; width: 44px; height: 54px; transform: translateX(-50%);
+    transform-origin: 50% 12px; filter: drop-shadow(0 3px 3px rgba(0,0,0,.25)); pointer-events: none; z-index: 2;
+  }
+  .pointer.wiggle { animation: wiggle .12s ease-out; }
+  @keyframes wiggle { 0% { transform: translateX(-50%) rotate(0); } 40% { transform: translateX(-50%) rotate(-18deg); } 100% { transform: translateX(-50%) rotate(0); } }
+  .hub {
+    position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; transform: translate(-50%, -50%);
+    border-radius: 50%; border: none; background: radial-gradient(circle at 35% 30%, #fff, #f1e9ff);
+    box-shadow: 0 4px 14px rgba(0,0,0,.18), inset 0 -3px 0 rgba(0,0,0,.06);
+    font-weight: 800; font-size: clamp(14px, 2.6vw, 22px); color: var(--accent-2); z-index: 2;
+  }
+  .hub:hover { transform: translate(-50%, -50%) scale(1.04); }
+  .hub:disabled { cursor: default; transform: translate(-50%, -50%); }
+  .stage-info { color: var(--muted); font-size: 15px; text-align: center; }
+  .empty {
+    text-align: center; color: var(--muted); max-width: 420px; line-height: 1.5;
+  }
+  .empty .big { font-size: 64px; }
+  .empty h2 { color: var(--ink); margin: 8px 0; }
+
+  aside { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .card { background: var(--panel); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; }
+  .card h3 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .card .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .count { font-size: 13px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+
+  .roster { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow: auto; }
+  .roster li {
+    display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; cursor: pointer;
+    user-select: none; transition: background .12s;
+  }
+  .roster li:hover { background: #faf4ea; }
+  .roster .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .roster .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .roster .tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .roster li.sick .name { color: var(--muted); text-decoration: line-through; }
+  .roster li.sick .tag { background: #fff3cc; color: #8a6400; }
+  .roster li.drawn .name { color: var(--muted); }
+  .roster li.drawn .tag { background: #e7f6ef; color: #12704f; }
+  .roster li.present .tag { background: #f2effa; color: var(--accent-2); }
+
+  .drawn-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+  .drawn-list li {
+    display: inline-flex; align-items: center; gap: 4px; background: #e7f6ef; color: #12704f;
+    border-radius: 99px; padding: 4px 6px 4px 12px; font-weight: 700; font-size: 14px;
+  }
+  .drawn-list li button { border: none; background: transparent; padding: 0 6px; font-size: 15px; color: #12704f; border-radius: 99px; }
+  .drawn-list li button:hover { background: #cdeee0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+  label.toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; margin-top: 8px; }
+  label.toggle input { width: 18px; height: 18px; accent-color: var(--accent-2); }
+
+  /* Dialogs */
+  dialog {
+    border: none; border-radius: 22px; padding: 0; box-shadow: 0 30px 80px rgba(0,0,0,.25);
+    width: min(720px, calc(100vw - 24px)); max-height: calc(100vh - 24px); color: var(--ink);
+  }
+  dialog::backdrop { background: rgba(43, 33, 64, .45); backdrop-filter: blur(2px); }
+  .dlg-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--line); }
+  .dlg-head h2 { margin: 0; font-size: 20px; }
+  .dlg-body { padding: 20px; overflow: auto; max-height: calc(100vh - 160px); }
+  .manage { display: grid; grid-template-columns: 220px 1fr; gap: 18px; }
+  @media (max-width: 640px) { .manage { grid-template-columns: 1fr; } }
+  .class-list { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .class-list li button {
+    width: 100%; text-align: left; border: 1px solid transparent; background: transparent; padding: 9px 12px; border-radius: 10px; font-weight: 600;
+    display: flex; justify-content: space-between; gap: 8px;
+  }
+  .class-list li button:hover { background: #faf4ea; }
+  .class-list li button.active { background: #f2effa; border-color: #dcd5fa; color: var(--accent-2); }
+  .class-list small { color: var(--muted); font-weight: 600; }
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .field label { font-size: 13px; font-weight: 700; color: var(--muted); }
+  .field input, .field textarea {
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fffdf9; width: 100%;
+  }
+  .field textarea { min-height: 260px; resize: vertical; line-height: 1.5; }
+  .field input:focus, .field textarea:focus { outline: 2px solid #c9c2ff; border-color: transparent; }
+
+  /* Winner */
+  .overlay {
+    position: fixed; inset: 0; z-index: 100; display: none; align-items: center; justify-content: center; padding: 12px;
+    background: rgba(43, 33, 64, .5); backdrop-filter: blur(3px);
+  }
+  .overlay.open { display: flex; }
+  #winner {
+    width: min(620px, calc(100vw - 24px)); text-align: center; border-radius: 26px; box-shadow: 0 30px 80px rgba(0,0,0,.3);
+    background: radial-gradient(circle at 50% 0%, #fff6d8, #ffffff 60%);
+  }
+  #winner .inner { padding: 34px 24px 24px; }
+  #winner .phrase { font-size: 22px; font-weight: 800; color: var(--accent); margin: 0; letter-spacing: .02em; }
+  #winner .emoji { font-size: 84px; line-height: 1; margin: 10px 0 0; display: inline-block; }
+  #winner .wname {
+    font-size: clamp(40px, 9vw, 84px); font-weight: 900; margin: 6px 0 4px; line-height: 1.05; word-break: break-word;
+    background: linear-gradient(90deg, #ff5d73, #ff9f43, #5b5bf0, #ff5d73); background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shimmer 3s linear infinite;
+  }
+  #winner .sub { color: var(--muted); margin: 0 0 22px; }
+  #winner .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  #winner .actions .btn { padding: 12px 18px; font-size: 16px; }
+  .overlay.open #winner { animation: pop .55s cubic-bezier(.2, 1.6, .4, 1); }
+  .overlay.open #winner .emoji { animation: bounce 1s ease-in-out infinite, spinIn .7s cubic-bezier(.2,1.4,.4,1); }
+  .overlay.open #winner .wname { animation: shimmer 3s linear infinite, zoomIn .7s .1s cubic-bezier(.2, 1.6, .4, 1) both; }
+  @keyframes pop { 0% { transform: scale(.3) rotate(-8deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+  @keyframes zoomIn { 0% { transform: scale(0) rotate(12deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes spinIn { 0% { transform: rotate(-540deg) scale(0); } 100% { transform: rotate(0) scale(1); } }
+  @keyframes bounce { 0%, 100% { translate: 0 0; } 50% { translate: 0 -14px; } }
+  @keyframes shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+
+
+  /* Tabs */
+  .tabs { display: inline-flex; background: #f4ecdf; border-radius: 12px; padding: 3px; gap: 2px; }
+  .tabs button { border: none; background: transparent; padding: 7px 14px; border-radius: 9px; font-weight: 700; color: var(--muted); }
+  .tabs button.active { background: var(--panel); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+  /* Groups */
+  .groups-view { width: 100%; display: flex; flex-direction: column; gap: 18px; align-self: stretch; }
+  .groups-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; }
+  .groups-bar .seg { display: inline-flex; background: #f4ecdf; border-radius: 12px; padding: 3px; }
+  .groups-bar .seg button { border: none; background: transparent; padding: 6px 12px; border-radius: 9px; font-weight: 700; color: var(--muted); }
+  .groups-bar .seg button.active { background: var(--panel); color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; }
+  .stepper button { border: none; background: transparent; width: 38px; height: 40px; font-size: 20px; font-weight: 800; }
+  .stepper button:hover { background: #faf4ea; }
+  .stepper input { width: 52px; text-align: center; border: none; font-weight: 800; font-size: 18px; -moz-appearance: textfield; }
+  .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .groups-preview { text-align: center; color: var(--muted); font-size: 14px; }
+  .groups-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+  .group {
+    border-radius: 16px; padding: 14px 14px 12px; background: #fff; border: 2px solid var(--gc); position: relative;
+    box-shadow: 0 4px 0 var(--gc); animation: dropIn .55s cubic-bezier(.2, 1.5, .4, 1) both;
+  }
+  .group h4 { margin: 0 0 8px; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+  .group h4 .ge { font-size: 26px; }
+  .group h4 small { margin-left: auto; color: var(--muted); font-size: 12px; }
+  .group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .group li { padding: 5px 10px; border-radius: 9px; background: color-mix(in srgb, var(--gc) 14%, white); font-weight: 700; animation: fadeUp .4s both; }
+  @keyframes dropIn { 0% { transform: translateY(-40px) scale(.8) rotate(-4deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  @keyframes fadeUp { 0% { transform: translateY(8px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  .shuffling .group { animation: shake .35s ease-in-out infinite; }
+  @keyframes shake { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-2deg) translateY(-2px); } 75% { transform: rotate(2deg) translateY(2px); } }
+  body.mode-groups #drawnCard { display: none; }
+  body.mode-groups .stage { justify-content: flex-start; }
+
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 200; }
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 12px; font-weight: 600; transition: .25s; z-index: 50;
+    display: flex; gap: 12px; align-items: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast button { background: transparent; border: 1px solid rgba(255,255,255,.35); color: #fff; border-radius: 8px; padding: 2px 10px; }
+  .kbd { font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 0 6px; background: #fff; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 0 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎡 Zufalls<span>generator</span></h1>
+  <select class="class-select" id="classSelect" aria-label="Klasse wählen"></select>
+  <button class="btn" id="manageBtn">✏️ Klassen verwalten</button>
+  <div class="tabs" role="tablist">
+    <button class="active" data-mode="wheel" role="tab">🎡 Glücksrad</button>
+    <button data-mode="groups" role="tab">👥 Gruppen</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn ghost" id="soundBtn" title="Ton an/aus">🔊</button>
+  <button class="btn ghost" id="fullscreenBtn" title="Vollbild">⛶</button>
+</header>
+
+<main>
+  <section class="stage" id="stage">
+    <div class="wheel-wrap" id="wheelWrap">
+      <svg class="pointer" id="pointer" viewBox="0 0 44 54" aria-hidden="true">
+        <path d="M22 52 L4 14 A18 18 0 1 1 40 14 Z" fill="#2b2140"/>
+        <circle cx="22" cy="14" r="7" fill="#fff"/>
+      </svg>
+      <canvas id="wheel" aria-label="Glücksrad"></canvas>
+      <button class="hub" id="spinBtn">DREH!</button>
+    </div>
+    <div class="stage-info" id="stageInfo"></div>
+    <div class="empty" id="emptyState" hidden></div>
+    <div class="groups-view" id="groupsView" hidden>
+      <div class="groups-bar">
+        <div class="seg" id="groupModeSeg">
+          <button data-gmode="size" class="active">Personen pro Gruppe</button>
+          <button data-gmode="count">Anzahl Gruppen</button>
+        </div>
+        <div class="stepper">
+          <button id="gMinus" aria-label="weniger">−</button>
+          <input id="gValue" type="number" min="1" max="99" value="5" aria-label="Wert">
+          <button id="gPlus" aria-label="mehr">＋</button>
+        </div>
+        <button class="btn primary" id="makeGroupsBtn">🎲 Gruppen bilden</button>
+        <button class="btn" id="copyGroupsBtn" hidden>📋 Kopieren</button>
+      </div>
+      <div class="groups-preview" id="groupsPreview"></div>
+      <div class="groups-grid" id="groupsGrid"></div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <div class="card-head">
+        <h3>👋 Heute da?</h3>
+        <span class="count" id="presentCount"></span>
+      </div>
+      <p class="hint">Antippen, wer heute fehlt (z.B. krank). Die Klassenliste bleibt dabei unverändert.</p>
+      <ul class="roster" id="roster"></ul>
+      <div class="row">
+        <button class="btn small" id="allPresentBtn">Alle anwesend</button>
+      </div>
+    </div>
+
+    <div class="card" id="drawnCard">
+      <div class="card-head">
+        <h3>✅ Schon dran gewesen</h3>
+        <span class="count" id="drawnCount"></span>
+      </div>
+      <p class="hint">Diese Namen sind für die nächsten Auslosungen aus dem Rad genommen.</p>
+      <ul class="drawn-list" id="drawnList"></ul>
+      <div class="row">
+        <button class="btn small" id="resetDrawnBtn">🔄 Alle zurück ins Rad</button>
+      </div>
+      <label class="toggle"><input type="checkbox" id="autoRemove"> Gezogene automatisch entfernen</label>
+    </div>
+  </aside>
+</main>
+<footer>Alle Daten bleiben nur in diesem Browser gespeichert. Tipp: <span class="kbd">Leertaste</span> dreht das Rad bzw. bildet Gruppen.</footer>
+
+<!-- Manage dialog -->
+<dialog id="manageDlg">
+  <div class="dlg-head">
+    <h2>Klassen verwalten</h2>
+    <button class="btn ghost" data-close>✕</button>
+  </div>
+  <div class="dlg-body">
+    <div class="manage">
+      <div>
+        <ul class="class-list" id="manageClassList"></ul>
+        <button class="btn small blue" id="addClassBtn">＋ Neue Klasse</button>
+        <div class="row" style="margin-top:22px">
+          <button class="btn small" id="exportBtn">⬇️ Sichern</button>
+          <button class="btn small" id="importBtn">⬆️ Laden</button>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+        </div>
+      </div>
+      <div id="manageEditor"></div>
+    </div>
+  </div>
+</dialog>
+
+<!-- Winner dialog -->
+<div class="overlay" id="winnerOverlay">
+<div id="winner" role="dialog" aria-modal="true" aria-labelledby="wName">
+  <div class="inner">
+    <p class="phrase" id="wPhrase"></p>
+    <div class="emoji" id="wEmoji"></div>
+    <div class="wname" id="wName"></div>
+    <p class="sub" id="wSub"></p>
+    <div class="actions">
+      <button class="btn primary" id="wRemove">✅ Entfernen für nächste Auslosung</button>
+      <button class="btn" id="wKeep">Im Rad lassen</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<canvas id="fx"></canvas>
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo" hidden>Rückgängig</button></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Storage ----------
+  const KEY = 'zufallsgenerator.v1';
+  const today = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+  const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+
+  function defaultState() {
+    return { classes: [], activeClassId: null, sessions: {}, settings: { sound: true, autoRemove: false, mode: 'wheel', gmode: 'size', gvalue: 5 } };
+  }
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY));
+      if (s && Array.isArray(s.classes)) {
+        s.sessions ||= {}; s.settings = Object.assign({ sound: true, autoRemove: false, mode: 'wheel', gmode: 'size', gvalue: 5 }, s.settings);
+        return s;
+      }
+    } catch (e) { /* ignore */ }
+    return defaultState();
+  }
+  let state = load();
+  const save = () => localStorage.setItem(KEY, JSON.stringify(state));
+
+  const activeClass = () => state.classes.find(c => c.id === state.activeClassId) || null;
+
+  // Session per class: absent ("krank") resets automatically on a new day; drawn stays until reset.
+  function session(cls) {
+    let s = state.sessions[cls.id];
+    if (!s) s = state.sessions[cls.id] = { date: today(), absent: [], drawn: [] };
+    if (s.date !== today()) { s.date = today(); s.absent = []; }
+    const ids = new Set(cls.students.map(st => st.id));
+    s.absent = s.absent.filter(id => ids.has(id));
+    s.drawn = s.drawn.filter(id => ids.has(id));
+    return s;
+  }
+  function pool(cls) {
+    const s = session(cls);
+    return cls.students.filter(st => !s.absent.includes(st.id) && !s.drawn.includes(st.id));
+  }
+
+  // ---------- Elements ----------
+  const $ = id => document.getElementById(id);
+  const classSelect = $('classSelect'), roster = $('roster'), drawnList = $('drawnList');
+  const canvas = $('wheel'), ctx = canvas.getContext('2d'), spinBtn = $('spinBtn'), pointer = $('pointer');
+  const stageInfo = $('stageInfo'), emptyState = $('emptyState'), wheelWrap = $('wheelWrap');
+
+  const COLORS = ['#ff5d73', '#ffb547', '#4cc9a0', '#5b8def', '#a66cff', '#ff8fb1', '#2ec4d6', '#ffd23f', '#7bd389', '#f77f00'];
+  const colorFor = (i, n) => {
+    // avoid identical neighbour colours where the wheel wraps around
+    if (n > 1 && i === n - 1 && (n - 1) % COLORS.length === 0) return COLORS[3];
+    return COLORS[i % COLORS.length];
+  };
+  const escapeHtml = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ---------- Rendering ----------
+  let rotation = 0, spinning = false, wheelItems = [];
+
+  function render() {
+    // class select
+    classSelect.innerHTML = state.classes.length
+      ? state.classes.map(c => `<option value="${c.id}" ${c.id === state.activeClassId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')
+      : '<option>— keine Klasse —</option>';
+    classSelect.disabled = !state.classes.length;
+
+    const cls = activeClass();
+    $('soundBtn').textContent = state.settings.sound ? '🔊' : '🔇';
+    $('autoRemove').checked = !!state.settings.autoRemove;
+
+    if (!cls) {
+      $('groupsView').hidden = true;
+      roster.innerHTML = ''; drawnList.innerHTML = '';
+      $('presentCount').textContent = ''; $('drawnCount').textContent = '';
+      showEmpty('🏫', 'Willkommen!', 'Lege zuerst eine Klasse mit deinen Schülerinnen und Schülern an.', 'Klasse anlegen', () => openManage(true));
+      return;
+    }
+    const s = session(cls);
+    const sorted = [...cls.students].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    roster.innerHTML = sorted.map(st => {
+      const sick = s.absent.includes(st.id), drawn = s.drawn.includes(st.id);
+      const idx = wheelIndexOf(st.id, cls);
+      const cl = sick ? 'sick' : drawn ? 'drawn' : 'present';
+      const tag = sick ? '🤒 fehlt' : drawn ? '✓ dran gewesen' : 'im Rad';
+      const dot = sick || drawn ? '#ddd' : colorFor(idx, pool(cls).length);
+      return `<li class="${cl}" data-id="${st.id}" title="${sick ? 'Wieder als anwesend markieren' : 'Als abwesend markieren'}">
+        <span class="dot" style="background:${dot}"></span><span class="name">${escapeHtml(st.name)}</span><span class="tag">${tag}</span></li>`;
+    }).join('') || '<li style="cursor:default;color:var(--muted)">Noch keine Namen in dieser Klasse.</li>';
+
+    const present = cls.students.length - s.absent.length;
+    $('presentCount').textContent = `${present} von ${cls.students.length} da`;
+    const drawnStudents = s.drawn.map(id => cls.students.find(st => st.id === id)).filter(Boolean);
+    drawnList.innerHTML = drawnStudents.length
+      ? drawnStudents.map(st => `<li>${escapeHtml(st.name)}<button data-undraw="${st.id}" title="Zurück ins Rad">↩︎</button></li>`).join('')
+      : '<li style="background:transparent;color:var(--muted);font-weight:500;padding-left:0">Noch niemand.</li>';
+    $('drawnCount').textContent = drawnStudents.length ? `${drawnStudents.length}` : '';
+    $('resetDrawnBtn').disabled = !drawnStudents.length;
+    $('allPresentBtn').disabled = !s.absent.length;
+
+    const p = pool(cls);
+    $('groupsView').hidden = true;
+    document.body.classList.toggle('mode-groups', state.settings.mode === 'groups');
+    document.querySelectorAll('.tabs [data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === state.settings.mode));
+    const presentList = cls.students.filter(st => !s.absent.includes(st.id));
+    if (!cls.students.length) {
+      showEmpty('📝', `${cls.name} ist noch leer`, 'Füge Namen hinzu, damit sich das Rad drehen kann.', 'Namen eintragen', () => openManage());
+    } else if (state.settings.mode === 'groups' && !presentList.length) {
+      showEmpty('🤒', 'Niemand da', 'Alle sind als abwesend markiert.', 'Alle anwesend', allPresent);
+    } else if (state.settings.mode !== 'groups' && !p.length && drawnStudents.length) {
+      showEmpty('🎉', 'Alle waren dran!', 'Jede anwesende Person wurde schon ausgelost.', '🔄 Neue Runde starten', resetDrawn);
+    } else if (state.settings.mode !== 'groups' && !p.length) {
+      showEmpty('🤒', 'Niemand im Rad', 'Alle sind als abwesend markiert.', 'Alle anwesend', allPresent);
+    } else if (state.settings.mode === 'groups') {
+      emptyState.hidden = true; wheelWrap.hidden = true; stageInfo.hidden = true;
+      $('groupsView').hidden = false; renderGroups(cls);
+    } else {
+      emptyState.hidden = true; wheelWrap.hidden = false;
+      stageInfo.hidden = false;
+      stageInfo.textContent = p.length === 1 ? 'Nur noch eine Person im Rad.' : `${p.length} Namen im Rad`;
+    }
+    if (!spinning) setWheelItems(p);
+  }
+
+  function showEmpty(icon, title, text, btnLabel, action) {
+    wheelWrap.hidden = true; stageInfo.hidden = true; emptyState.hidden = false;
+    emptyState.innerHTML = `<div class="big">${icon}</div><h2>${escapeHtml(title)}</h2><p>${escapeHtml(text)}</p>
+      <button class="btn primary" id="emptyAction">${btnLabel}</button>`;
+    $('emptyAction').onclick = action;
+  }
+
+  function wheelIndexOf(id, cls) { return pool(cls).findIndex(st => st.id === id); }
+
+  function setWheelItems(items) { wheelItems = items.slice(); drawWheel(); }
+
+  function sizeCanvas() {
+    const r = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const px = Math.max(200, Math.round(r.width * dpr));
+    if (canvas.width !== px) { canvas.width = px; canvas.height = px; }
+    drawWheel();
+  }
+
+  function drawWheel() {
+    const W = canvas.width; if (!W) return;
+    const c = W / 2, R = c * 0.96, n = wheelItems.length;
+    ctx.clearRect(0, 0, W, W);
+    // rim
+    ctx.beginPath(); ctx.arc(c, c, R + c * 0.035, 0, Math.PI * 2); ctx.fillStyle = '#2b2140'; ctx.fill();
+    if (!n) return;
+    const seg = Math.PI * 2 / n;
+    for (let i = 0; i < n; i++) {
+      const a0 = -Math.PI / 2 + rotation + i * seg, a1 = a0 + seg;
+      ctx.beginPath(); ctx.moveTo(c, c); ctx.arc(c, c, R, a0, a1); ctx.closePath();
+      ctx.fillStyle = colorFor(i, n); ctx.fill();
+      if (n > 1) { ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = W * 0.004; ctx.stroke(); }
+      // label
+      ctx.save();
+      ctx.translate(c, c); ctx.rotate(a0 + seg / 2);
+      const name = wheelItems[i].name;
+      const maxW = R * 0.66;
+      let fs = Math.min(W * 0.055, (seg * R * 0.62) * 0.8);
+      fs = Math.max(fs, W * 0.016);
+      ctx.font = `800 ${fs}px ui-rounded, "SF Pro Rounded", Nunito, system-ui, sans-serif`;
+      while (ctx.measureText(name).width > maxW && fs > W * 0.016) { fs *= 0.92; ctx.font = `800 ${fs}px ui-rounded, "SF Pro Rounded", Nunito, system-ui, sans-serif`; }
+      let label = name;
+      if (ctx.measureText(label).width > maxW) { while (label.length > 1 && ctx.measureText(label + '…').width > maxW) label = label.slice(0, -1); label += '…'; }
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,.25)'; ctx.shadowBlur = W * 0.006;
+      ctx.fillText(label, R * 0.9, 0);
+      ctx.restore();
+    }
+    // pegs
+    for (let i = 0; i < n && n <= 60; i++) {
+      const a = -Math.PI / 2 + rotation + i * seg;
+      ctx.beginPath(); ctx.arc(c + Math.cos(a) * (R + c * 0.0), c + Math.sin(a) * (R + c * 0.0), W * 0.009, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff'; ctx.fill();
+    }
+  }
+
+  // ---------- Sound ----------
+  let audio;
+  const ac = () => (audio ||= new (window.AudioContext || window.webkitAudioContext)());
+  function tone(freq, dur, type = 'triangle', vol = 0.15, when = 0) {
+    if (!state.settings.sound) return;
+    try {
+      const a = ac(), t = a.currentTime + when;
+      const o = a.createOscillator(), g = a.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) { /* no audio */ }
+  }
+  const tick = () => tone(1400 + Math.random() * 200, 0.04, 'square', 0.05);
+  function fanfare() {
+    [[523, 0], [659, .12], [784, .24], [1047, .38]].forEach(([f, w]) => tone(f, .35, 'triangle', .16, w));
+    [[1047, .38], [1319, .38]].forEach(([f, w]) => tone(f, .7, 'sine', .08, w));
+  }
+
+  // ---------- Spin ----------
+  const randInt = n => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; };
+  const rand = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 2 ** 32; };
+  const TAU = Math.PI * 2;
+  const mod = (a, m) => ((a % m) + m) % m;
+  const indexAtPointer = (rot, n) => Math.floor(mod(-rot, TAU) / (TAU / n)) % n;
+
+  function spin() {
+    const cls = activeClass();
+    if (spinning || !cls) return;
+    const items = pool(cls);
+    if (!items.length) return;
+    ac && state.settings.sound && ac().resume?.();
+    setWheelItems(items);
+    const n = items.length, seg = TAU / n;
+    const target = randInt(n);
+    const jitter = (rand() - 0.5) * 0.7; // stay away from segment borders
+    const want = mod(-(target + 0.5 + jitter) * seg, TAU);
+    const extra = mod(want - mod(rotation, TAU), TAU);
+    const turns = 5 + randInt(3);
+    const start = rotation, end = rotation + extra + turns * TAU;
+    const duration = 4600 + randInt(1400);
+    const t0 = performance.now();
+    let lastIdx = indexAtPointer(start, n);
+    spinning = true; spinBtn.disabled = true; spinBtn.textContent = '…';
+    const ease = t => 1 - Math.pow(1 - t, 4);
+    function frame(now) {
+      const t = Math.min(1, (now - t0) / duration);
+      rotation = start + (end - start) * ease(t);
+      drawWheel();
+      const idx = indexAtPointer(rotation, n);
+      if (idx !== lastIdx) {
+        lastIdx = idx; tick();
+        pointer.classList.remove('wiggle'); void pointer.offsetWidth; pointer.classList.add('wiggle');
+      }
+      if (t < 1) requestAnimationFrame(frame);
+      else {
+        rotation = mod(rotation, TAU);
+        spinning = false; spinBtn.disabled = false; spinBtn.textContent = 'DREH!';
+        celebrate(items[indexAtPointer(rotation, n)]);
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Winner ----------
+  const PHRASES = ['Tadaaa!', 'Du bist dran!', 'Your turn!', 'And the winner is …', 'Bühne frei für', 'Jackpot!', 'Das Rad hat entschieden:', 'Ready, steady, go!', 'Lucky you!', 'Trommelwirbel …'];
+  const EMOJIS = ['🎉', '🦄', '🚀', '🌟', '🥳', '🐸', '🦖', '🍕', '🎈', '👑', '🐙', '🦊', '🌈', '🐧', '🎸', '🧁'];
+  const SUBS = ['Herzlichen Glückwunsch!', 'Alle Augen auf dich 👀', 'Heute ist dein Glückstag!', 'Show us what you’ve got!', 'Applaus, Applaus! 👏', 'You can do it! 💪'];
+  const pick = arr => arr[randInt(arr.length)];
+  let current = null;
+
+  function celebrate(st) {
+    current = st;
+    const emoji = pick(EMOJIS);
+    $('wPhrase').textContent = pick(PHRASES);
+    $('wEmoji').textContent = emoji;
+    $('wName').textContent = st.name;
+    $('wSub').textContent = pick(SUBS);
+    fanfare();
+    $('winnerOverlay').classList.add('open');
+    $('wRemove').focus();
+    burst(emoji);
+    if (state.settings.autoRemove) { markDrawn(st.id); $('wRemove').hidden = true; $('wKeep').textContent = 'Weiter'; }
+    else { $('wRemove').hidden = false; $('wKeep').textContent = 'Im Rad lassen'; }
+  }
+  function closeWinner() { $('winnerOverlay').classList.remove('open'); current = null; }
+  $('wRemove').onclick = () => { if (current) markDrawn(current.id); closeWinner(); };
+  $('wKeep').onclick = closeWinner;
+  $('winnerOverlay').addEventListener('click', e => { if (e.target.id === 'winnerOverlay') closeWinner(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('winnerOverlay').classList.contains('open')) closeWinner(); });
+
+  function markDrawn(id) {
+    const cls = activeClass(); if (!cls) return;
+    const s = session(cls);
+    if (!s.drawn.includes(id)) s.drawn.push(id);
+    save(); render();
+  }
+
+  // ---------- Confetti / emoji rain ----------
+  const fx = $('fx'), fctx = fx.getContext('2d');
+  let parts = [], fxRunning = false;
+  function sizeFx() { const d = Math.min(devicePixelRatio || 1, 2); fx.width = innerWidth * d; fx.height = innerHeight * d; fctx.setTransform(d, 0, 0, d, 0, 0); }
+  function burst(emoji) {
+    sizeFx();
+    const W = innerWidth, H = innerHeight;
+    const colors = ['#ff5d73', '#ffb547', '#4cc9a0', '#5b8def', '#a66cff', '#ffd23f', '#ff8fb1'];
+    for (let side = 0; side < 2; side++) {
+      for (let i = 0; i < 90; i++) {
+        const x = side ? W + 10 : -10, y = H * 0.75;
+        const ang = (side ? Math.PI + 0.35 : -0.35) - rand() * 0.9 * (side ? -1 : 1);
+        const sp = 9 + rand() * 11;
+        parts.push({ x, y, vx: Math.cos(ang) * sp * (side ? 1 : 1), vy: -Math.abs(Math.sin(ang) * sp) - 6 - rand() * 6,
+          w: 6 + rand() * 7, h: 9 + rand() * 9, rot: rand() * TAU, vr: (rand() - .5) * .35, c: pick(colors), life: 0, kind: 'paper' });
+      }
+    }
+    for (let i = 0; i < 22; i++) {
+      parts.push({ x: rand() * W, y: -40 - rand() * H * 0.6, vx: (rand() - .5) * 1.5, vy: 2 + rand() * 3, size: 26 + rand() * 26,
+        rot: (rand() - .5), vr: (rand() - .5) * .06, e: rand() < .6 ? emoji : pick(EMOJIS), life: 0, kind: 'emoji' });
+    }
+    if (!fxRunning) { fxRunning = true; requestAnimationFrame(stepFx); }
+  }
+  function stepFx() {
+    const W = innerWidth, H = innerHeight;
+    fctx.clearRect(0, 0, W, H);
+    parts = parts.filter(p => p.y < H + 60 && p.life < 600);
+    for (const p of parts) {
+      p.life++;
+      if (p.kind === 'paper') {
+        p.vy += 0.32; p.vx *= 0.985; p.vy *= 0.985; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot); fctx.scale(1, Math.cos(p.life * 0.15));
+        fctx.fillStyle = p.c; fctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); fctx.restore();
+      } else {
+        p.vy += 0.05; p.x += p.vx + Math.sin(p.life * 0.05) * 0.8; p.y += p.vy; p.rot += p.vr;
+        fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot); fctx.font = `${p.size}px serif`;
+        fctx.textAlign = 'center'; fctx.fillText(p.e, 0, 0); fctx.restore();
+      }
+    }
+    if (parts.length) requestAnimationFrame(stepFx); else { fxRunning = false; fctx.clearRect(0, 0, W, H); }
+  }
+
+
+  // ---------- Groups ----------
+  const GROUP_EMOJIS = ['🦁', '🐼', '🦄', '🐸', '🦊', '🐙', '🐧', '🦖', '🐝', '🐬', '🦉', '🐢', '🦜', '🐨', '🦩', '🐯', '🐳', '🦔', '🐞', '🦒'];
+  const GROUP_NAMES = ['Lions', 'Pandas', 'Unicorns', 'Frogs', 'Foxes', 'Octopuses', 'Penguins', 'Dinos', 'Bees', 'Dolphins', 'Owls', 'Turtles', 'Parrots', 'Koalas', 'Flamingos', 'Tigers', 'Whales', 'Hedgehogs', 'Ladybirds', 'Giraffes'];
+  let lastGroups = null; // { classId, groups: [{emoji, name, members:[ids]}] }
+
+  function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = randInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function groupCount(n) {
+    const v = Math.max(1, state.settings.gvalue | 0);
+    return Math.max(1, Math.min(n, state.settings.gmode === 'size' ? Math.ceil(n / v) : v));
+  }
+  function sizesFor(n) {
+    const g = groupCount(n), base = Math.floor(n / g), rest = n % g;
+    return Array.from({ length: g }, (_, i) => base + (i < rest ? 1 : 0));
+  }
+  function describeSizes(sizes) {
+    const counts = {}; sizes.forEach(x => counts[x] = (counts[x] || 0) + 1);
+    return Object.keys(counts).sort((a, b) => b - a).map(k => `${counts[k]} × ${k}`).join(' + ');
+  }
+  function presentStudents(cls) { const s = session(cls); return cls.students.filter(st => !s.absent.includes(st.id)); }
+
+  function renderGroups(cls) {
+    const present = presentStudents(cls);
+    document.querySelectorAll('#groupModeSeg [data-gmode]').forEach(b => b.classList.toggle('active', b.dataset.gmode === state.settings.gmode));
+    $('gValue').value = state.settings.gvalue;
+    const sizes = sizesFor(present.length);
+    $('groupsPreview').textContent = `${present.length} anwesend → ${sizes.length} ${sizes.length === 1 ? 'Gruppe' : 'Gruppen'} (${describeSizes(sizes)} Personen)`;
+    const g = lastGroups && lastGroups.classId === cls.id ? lastGroups : null;
+    $('copyGroupsBtn').hidden = !g;
+    if (!g) { $('groupsGrid').innerHTML = ''; return; }
+    const byId = new Map(cls.students.map(st => [st.id, st]));
+    $('groupsGrid').innerHTML = g.groups.map((gr, i) => {
+      const members = gr.members.map(id => byId.get(id)).filter(Boolean);
+      return `<div class="group" style="--gc:${COLORS[i % COLORS.length]};animation-delay:${i * 90}ms">
+        <h4><span class="ge">${gr.emoji}</span>${escapeHtml(gr.name)}<small>${members.length}</small></h4>
+        <ul>${members.map((m, j) => `<li style="animation-delay:${i * 90 + 200 + j * 60}ms">${escapeHtml(m.name)}</li>`).join('')}</ul></div>`;
+    }).join('');
+  }
+
+  let shuffling = false;
+  function makeGroups() {
+    const cls = activeClass(); if (!cls || shuffling) return;
+    const present = presentStudents(cls); if (!present.length) return;
+    const sizes = sizesFor(present.length);
+    const order = shuffle(GROUP_EMOJIS.map((e, i) => i)).slice(0, sizes.length);
+    const build = () => {
+      const mixed = shuffle(present.map(st => st.id)); let k = 0;
+      return { classId: cls.id, groups: sizes.map((sz, i) => ({ emoji: GROUP_EMOJIS[order[i % order.length]], name: 'Team ' + GROUP_NAMES[order[i % order.length]], members: mixed.slice(k, k += sz) })) };
+    };
+    // quick "shuffle" animation, then the final result
+    shuffling = true; $('makeGroupsBtn').disabled = true;
+    const grid = $('groupsGrid'); grid.classList.add('shuffling');
+    let steps = 0;
+    const iv = setInterval(() => {
+      lastGroups = build(); renderGroups(cls); tick();
+      grid.querySelectorAll('.group, .group li').forEach(el => el.style.animation = 'none');
+      if (++steps >= 9) {
+        clearInterval(iv); grid.classList.remove('shuffling');
+        lastGroups = build(); renderGroups(cls);
+        shuffling = false; $('makeGroupsBtn').disabled = false; $('makeGroupsBtn').textContent = '🎲 Neu mischen';
+        fanfare(); burstGroups();
+      }
+    }, 110);
+  }
+  function burstGroups() {
+    sizeFx();
+    const W = innerWidth, H = innerHeight;
+    for (let i = 0; i < 120; i++) {
+      parts.push({ x: W / 2 + (rand() - .5) * 200, y: H * 0.35, vx: (rand() - .5) * 18, vy: -6 - rand() * 10,
+        w: 6 + rand() * 7, h: 9 + rand() * 9, rot: rand() * TAU, vr: (rand() - .5) * .35, c: pick(COLORS), life: 0, kind: 'paper' });
+    }
+    if (!fxRunning) { fxRunning = true; requestAnimationFrame(stepFx); }
+  }
+  $('makeGroupsBtn').onclick = makeGroups;
+  $('groupModeSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-gmode]'); if (!b) return;
+    state.settings.gmode = b.dataset.gmode;
+    if (b.dataset.gmode === 'count' && state.settings.gvalue > 12) state.settings.gvalue = 4;
+    save(); render();
+  });
+  const setG = v => { state.settings.gvalue = Math.max(1, Math.min(99, v | 0 || 1)); save(); render(); };
+  $('gMinus').onclick = () => setG(state.settings.gvalue - 1);
+  $('gPlus').onclick = () => setG(state.settings.gvalue + 1);
+  $('gValue').onchange = e => setG(+e.target.value);
+  $('copyGroupsBtn').onclick = async () => {
+    const cls = activeClass(); if (!cls || !lastGroups) return;
+    const byId = new Map(cls.students.map(st => [st.id, st.name]));
+    const text = lastGroups.groups.map(g => `${g.emoji} ${g.name}: ${g.members.map(id => byId.get(id)).filter(Boolean).join(', ')}`).join('\n');
+    try { await navigator.clipboard.writeText(text); toast('Gruppen kopiert.'); } catch { toast('Kopieren nicht möglich.'); }
+  };
+  document.querySelector('.tabs').addEventListener('click', e => {
+    const b = e.target.closest('[data-mode]'); if (!b || spinning || shuffling) return;
+    state.settings.mode = b.dataset.mode; save(); render();
+  });
+
+  // ---------- Roster actions ----------
+  roster.addEventListener('click', e => {
+    const li = e.target.closest('li[data-id]'); if (!li || spinning) return;
+    const cls = activeClass(); const s = session(cls); const id = li.dataset.id;
+    if (s.absent.includes(id)) s.absent = s.absent.filter(x => x !== id);
+    else s.absent.push(id);
+    save(); render();
+  });
+  drawnList.addEventListener('click', e => {
+    const b = e.target.closest('[data-undraw]'); if (!b || spinning) return;
+    const cls = activeClass(); const s = session(cls);
+    s.drawn = s.drawn.filter(x => x !== b.dataset.undraw); save(); render();
+  });
+  function resetDrawn() {
+    const cls = activeClass(); if (!cls) return; const s = session(cls);
+    const before = s.drawn.slice(); s.drawn = []; save(); render();
+    toast('Alle wieder im Rad.', () => { session(cls).drawn = before; save(); render(); });
+  }
+  function allPresent() {
+    const cls = activeClass(); if (!cls) return; const s = session(cls);
+    const before = s.absent.slice(); s.absent = []; save(); render();
+    toast('Alle als anwesend markiert.', () => { session(cls).absent = before; save(); render(); });
+  }
+  $('resetDrawnBtn').onclick = () => !spinning && resetDrawn();
+  $('allPresentBtn').onclick = () => !spinning && allPresent();
+  $('autoRemove').onchange = e => { state.settings.autoRemove = e.target.checked; save(); };
+  classSelect.onchange = () => { if (spinning) return; state.activeClassId = classSelect.value; rotation = 0; save(); render(); };
+  spinBtn.onclick = spin;
+  canvas.onclick = spin;
+  $('soundBtn').onclick = () => { state.settings.sound = !state.settings.sound; save(); render(); if (state.settings.sound) tone(880, .1); };
+  $('fullscreenBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space' && e.code !== 'Enter') return;
+    if (document.querySelector('dialog[open]') || $('winnerOverlay').classList.contains('open')) return;
+    if (e.target.closest('input, textarea, select, button')) return;
+    e.preventDefault(); state.settings.mode === 'groups' ? makeGroups() : spin();
+  });
+
+  let toastTimer;
+  function toast(msg, undo) {
+    const t = $('toast'); $('toastMsg').textContent = msg;
+    const u = $('toastUndo'); u.hidden = !undo; u.onclick = () => { undo(); t.classList.remove('show'); };
+    t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 5000);
+  }
+
+  // ---------- Manage dialog ----------
+  const manageDlg = $('manageDlg');
+  let editId = null;
+  document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+  manageDlg.addEventListener('close', () => render());
+  $('manageBtn').onclick = () => openManage();
+
+  function openManage(createNew) {
+    if (spinning) return;
+    editId = state.activeClassId || state.classes[0]?.id || null;
+    if (createNew || !state.classes.length) addClass();
+    renderManage();
+    if (!manageDlg.open) manageDlg.showModal();
+  }
+  function addClass() {
+    const n = state.classes.length + 1;
+    const cls = { id: uid(), name: `Neue Klasse ${n}`, students: [] };
+    state.classes.push(cls); state.activeClassId = cls.id; editId = cls.id; save();
+    return cls;
+  }
+  $('addClassBtn').onclick = () => { addClass(); renderManage(); $('clsName')?.select(); };
+
+  function renderManage() {
+    $('manageClassList').innerHTML = state.classes.map(c =>
+      `<li><button data-edit="${c.id}" class="${c.id === editId ? 'active' : ''}"><span>${escapeHtml(c.name)}</span><small>${c.students.length}</small></button></li>`
+    ).join('');
+    const cls = state.classes.find(c => c.id === editId);
+    const ed = $('manageEditor');
+    if (!cls) { ed.innerHTML = '<p class="hint">Lege links eine Klasse an.</p>'; return; }
+    ed.innerHTML = `
+      <div class="field"><label for="clsName">Name der Klasse</label><input id="clsName" value="${escapeHtml(cls.name)}" placeholder="z.B. 7b"></div>
+      <div class="field"><label for="clsStudents">Schülerinnen und Schüler — ein Name pro Zeile</label>
+        <textarea id="clsStudents" placeholder="Anna&#10;Ben&#10;Can&#10;…">${escapeHtml(cls.students.map(s => s.name).join('\n'))}</textarea></div>
+      <div class="row" style="justify-content:space-between">
+        <span class="hint" id="saveHint" style="margin:0">Änderungen werden automatisch gespeichert.</span>
+        <button class="btn small danger" id="delClassBtn">🗑 Klasse löschen</button>
+      </div>`;
+    $('clsName').oninput = e => { cls.name = e.target.value.trim() || 'Ohne Namen'; save(); refreshClassList(); };
+    $('clsStudents').oninput = e => { updateStudents(cls, e.target.value); refreshClassList(); };
+    $('delClassBtn').onclick = () => deleteClass(cls);
+  }
+  function refreshClassList() {
+    const cls = state.classes.find(c => c.id === editId);
+    const b = document.querySelector(`[data-edit="${editId}"]`);
+    if (b && cls) { b.querySelector('span').textContent = cls.name; b.querySelector('small').textContent = cls.students.length; }
+  }
+  $('manageClassList').addEventListener('click', e => {
+    const b = e.target.closest('[data-edit]'); if (!b) return;
+    editId = b.dataset.edit; state.activeClassId = editId; save(); renderManage();
+  });
+
+  function updateStudents(cls, text) {
+    const names = text.split('\n').map(s => s.trim()).filter(Boolean);
+    // keep IDs for unchanged names so absences / drawn status survive editing
+    const pool = new Map();
+    cls.students.forEach(s => { const k = s.name.toLocaleLowerCase('de'); if (!pool.has(k)) pool.set(k, []); pool.get(k).push(s.id); });
+    cls.students = names.map(name => {
+      const ids = pool.get(name.toLocaleLowerCase('de'));
+      return { id: ids?.length ? ids.shift() : uid(), name };
+    });
+    save();
+  }
+
+  let deleted = null;
+  function deleteClass(cls) {
+    const idx = state.classes.indexOf(cls);
+    deleted = { cls, idx, session: state.sessions[cls.id] };
+    state.classes.splice(idx, 1); delete state.sessions[cls.id];
+    if (state.activeClassId === cls.id) state.activeClassId = state.classes[0]?.id || null;
+    editId = state.activeClassId; save(); renderManage(); render();
+    toast(`„${cls.name}“ gelöscht.`, () => {
+      state.classes.splice(deleted.idx, 0, deleted.cls);
+      if (deleted.session) state.sessions[deleted.cls.id] = deleted.session;
+      state.activeClassId = editId = deleted.cls.id; save(); render(); if (manageDlg.open) renderManage();
+    });
+  }
+
+  // export / import
+  $('exportBtn').onclick = () => {
+    const data = JSON.stringify({ app: 'zufallsgenerator', version: 1, exportedAt: new Date().toISOString(), classes: state.classes }, null, 2);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    a.download = `zufallsgenerator-klassen-${today()}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const classes = (data.classes || []).filter(c => c && c.name && Array.isArray(c.students)).map(c => ({
+        id: uid(), name: String(c.name), students: c.students.map(s => ({ id: uid(), name: String(s.name ?? s) })).filter(s => s.name.trim())
+      }));
+      if (!classes.length) throw new Error('keine Klassen');
+      state.classes.push(...classes); state.activeClassId = editId = classes[0].id; save(); renderManage();
+      toast(`${classes.length} Klasse(n) geladen.`);
+    } catch (err) { toast('Datei konnte nicht gelesen werden.'); }
+  };
+
+  // ---------- Init ----------
+  if (!state.activeClassId && state.classes.length) state.activeClassId = state.classes[0].id;
+  window.addEventListener('resize', () => { sizeCanvas(); if (fxRunning) sizeFx(); });
+  window.addEventListener('storage', e => { if (e.key === KEY && !spinning) { state = load(); render(); } });
+  render();
+  new ResizeObserver(sizeCanvas).observe(canvas);
+  // reset "krank" automatically when the page is reopened on a new day
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !spinning) render(); });
+})();
+</script>
+</body>
+</html>
